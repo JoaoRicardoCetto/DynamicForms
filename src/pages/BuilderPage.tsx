@@ -7,9 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { buildFormSpec } from '@/lib/formBuilder';
 import { useState } from 'react';
-import { Plus, Trash2, Zap, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Zap, GripVertical, Library, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { Validacao } from '@/lib/types';
+import { Validacao, Campo } from '@/lib/types';
 
 export default function BuilderPage() {
   const [searchParams] = useSearchParams();
@@ -58,7 +58,7 @@ export default function BuilderPage() {
             <SectionCard
               key={secao.id}
               secao={secao}
-              campos={secaoCampos as any}
+              campos={secaoCampos as Campo[]}
               validacoes={validacoes}
               tiposDado={tiposDado}
               store={s}
@@ -68,13 +68,14 @@ export default function BuilderPage() {
         })}
       </div>
 
-      <AddSectionForm formSpecId={fs.id} store={s} />
+      <AddSectionArea formSpecId={fs.id} store={s} />
     </div>
   );
 }
 
 function SectionCard({ secao, campos, validacoes, tiposDado, store: s, formSpecId }: any) {
   const [showAddField, setShowAddField] = useState(false);
+  const [showImportField, setShowImportField] = useState(false);
 
   return (
     <Card>
@@ -83,6 +84,11 @@ function SectionCard({ secao, campos, validacoes, tiposDado, store: s, formSpecI
           <GripVertical className="w-4 h-4 text-muted-foreground" />
           <CardTitle className="text-base">{secao.titulo}</CardTitle>
           <Badge variant="secondary" className="text-xs font-mono">ordem: {secao.ordem}</Badge>
+          {secao.templateOriginId && (
+            <Badge variant="outline" className="text-xs gap-1">
+              <Library className="w-3 h-3" /> da biblioteca
+            </Badge>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -94,19 +100,70 @@ function SectionCard({ secao, campos, validacoes, tiposDado, store: s, formSpecI
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
-        {campos.map((campo: any) => (
+        {campos.map((campo: Campo) => (
           <FieldRow key={campo.id} campo={campo} validacoes={validacoes} tiposDado={tiposDado} store={s} />
         ))}
 
-        {showAddField ? (
-          <AddFieldForm secaoId={secao.id} tiposDado={tiposDado} store={s} onClose={() => setShowAddField(false)} />
-        ) : (
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowAddField(true)}>
-            <Plus className="w-3 h-3" /> Adicionar Campo
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {showAddField ? (
+            <AddFieldForm secaoId={secao.id} tiposDado={tiposDado} store={s} onClose={() => setShowAddField(false)} />
+          ) : showImportField ? (
+            <ImportFieldFromLibrary secaoId={secao.id} store={s} onClose={() => setShowImportField(false)} />
+          ) : (
+            <>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowAddField(true)}>
+                <Plus className="w-3 h-3" /> Novo Campo
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowImportField(true)}>
+                <Package className="w-3 h-3" /> Da Biblioteca
+              </Button>
+            </>
+          )}
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+function ImportFieldFromLibrary({ secaoId, store: s, onClose }: any) {
+  const templateCampos = s.getTemplateCampos();
+  const [selectedId, setSelectedId] = useState('');
+
+  if (templateCampos.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground animate-fade-in flex items-center gap-2">
+        Nenhum campo na biblioteca.
+        <Button size="sm" variant="ghost" onClick={onClose}>Fechar</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 animate-fade-in">
+      <Select value={selectedId} onValueChange={setSelectedId}>
+        <SelectTrigger className="text-sm w-60">
+          <SelectValue placeholder="Selecionar campo..." />
+        </SelectTrigger>
+        <SelectContent>
+          {templateCampos.map((c: Campo) => (
+            <SelectItem key={c.id} value={c.id}>{c.label} ({c.nome})</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        size="sm"
+        onClick={() => {
+          if (selectedId) {
+            s.cloneCampo(selectedId, secaoId);
+            toast.success('Campo importado da biblioteca');
+            onClose();
+          }
+        }}
+      >
+        Importar
+      </Button>
+      <Button size="sm" variant="ghost" onClick={onClose}>Cancelar</Button>
+    </div>
   );
 }
 
@@ -122,6 +179,11 @@ function FieldRow({ campo, validacoes, tiposDado, store: s }: any) {
           <span className="font-mono text-xs bg-secondary px-2 py-0.5 rounded">{tipo?.nome || '?'}</span>
           <span className="font-semibold text-sm">{campo.label}</span>
           <span className="text-xs text-muted-foreground font-mono">{campo.nome}</span>
+          {campo.templateOriginId && (
+            <Badge variant="outline" className="text-xs gap-1">
+              <Package className="w-3 h-3" /> biblioteca
+            </Badge>
+          )}
         </div>
         <Button variant="ghost" size="icon" onClick={() => s.deleteCampo(campo.id)} className="h-7 w-7 text-destructive">
           <Trash2 className="w-3 h-3" />
@@ -221,29 +283,67 @@ function AddFieldForm({ secaoId, tiposDado, store: s, onClose }: any) {
   );
 }
 
-function AddSectionForm({ formSpecId, store: s }: any) {
-  const [show, setShow] = useState(false);
+function AddSectionArea({ formSpecId, store: s }: any) {
+  const [mode, setMode] = useState<'idle' | 'create' | 'import'>('idle');
   const [titulo, setTitulo] = useState('');
+  const [selectedSecaoId, setSelectedSecaoId] = useState('');
+  const templateSecoes = s.getTemplateSecoes();
 
-  const handleAdd = () => {
+  const handleCreate = () => {
     if (!titulo.trim()) return;
     s.createSecao(formSpecId, titulo.trim());
     setTitulo('');
-    setShow(false);
+    setMode('idle');
+  };
+
+  const handleImport = () => {
+    if (!selectedSecaoId) return;
+    s.cloneSecaoIntoFormSpec(selectedSecaoId, formSpecId);
+    toast.success('Seção importada da biblioteca (cópia independente)');
+    setSelectedSecaoId('');
+    setMode('idle');
   };
 
   return (
     <div className="mt-6">
-      {show ? (
+      {mode === 'create' && (
         <div className="flex gap-2 items-center animate-fade-in">
           <Input placeholder="Título da seção" value={titulo} onChange={e => setTitulo(e.target.value)} />
-          <Button onClick={handleAdd}>Criar</Button>
-          <Button variant="ghost" onClick={() => setShow(false)}>Cancelar</Button>
+          <Button onClick={handleCreate}>Criar</Button>
+          <Button variant="ghost" onClick={() => setMode('idle')}>Cancelar</Button>
         </div>
-      ) : (
-        <Button variant="outline" className="gap-2" onClick={() => setShow(true)}>
-          <Plus className="w-4 h-4" /> Nova Seção
-        </Button>
+      )}
+      {mode === 'import' && (
+        <div className="flex gap-2 items-center animate-fade-in">
+          {templateSecoes.length === 0 ? (
+            <span className="text-sm text-muted-foreground">Nenhuma seção na biblioteca.</span>
+          ) : (
+            <>
+              <Select value={selectedSecaoId} onValueChange={setSelectedSecaoId}>
+                <SelectTrigger className="w-60 text-sm">
+                  <SelectValue placeholder="Selecionar seção..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {templateSecoes.map((sec: any) => (
+                    <SelectItem key={sec.id} value={sec.id}>{sec.titulo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleImport}>Importar</Button>
+            </>
+          )}
+          <Button variant="ghost" onClick={() => setMode('idle')}>Cancelar</Button>
+        </div>
+      )}
+      {mode === 'idle' && (
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setMode('create')}>
+            <Plus className="w-4 h-4" /> Nova Seção
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => setMode('import')}>
+            <Library className="w-4 h-4" /> Importar da Biblioteca
+          </Button>
+        </div>
       )}
     </div>
   );
