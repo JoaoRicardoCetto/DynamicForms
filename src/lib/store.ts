@@ -82,10 +82,12 @@ class MetadataStore {
     if (s) { Object.assign(s, updates); this.notify(); }
   }
 
-  deleteSecao(id: string, formSpecId: string) {
-    const fs = this.formSpecs.get(formSpecId);
-    if (fs) {
-      fs.secoes = fs.secoes.filter(s => s !== id);
+  deleteSecao(id: string, formSpecId?: string) {
+    if (formSpecId) {
+      const fs = this.formSpecs.get(formSpecId);
+      if (fs) {
+        fs.secoes = fs.secoes.filter(s => s !== id);
+      }
     }
     const secao = this.secoes.get(id);
     if (secao) {
