@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileJson, Eye, Inbox, Settings } from 'lucide-react';
+import { LayoutDashboard, FileJson, Eye, Inbox, Settings, Library } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/library', label: 'Biblioteca', icon: Library },
   { to: '/builder', label: 'Builder', icon: Settings },
   { to: '/preview', label: 'Preview', icon: Eye },
   { to: '/submissions', label: 'Submissões', icon: Inbox },
