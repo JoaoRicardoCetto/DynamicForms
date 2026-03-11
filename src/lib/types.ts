@@ -31,6 +31,8 @@ export interface Secao {
   titulo: string;
   campos: string[]; // campo IDs
   ordem: number;
+  isTemplate?: boolean; // true = library item, reusable
+  templateOriginId?: string; // ID of the template this was cloned from
 }
 
 export interface FormSpecMeta {
