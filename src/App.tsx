@@ -9,6 +9,7 @@ import BuilderPage from "./pages/BuilderPage";
 import PreviewPage from "./pages/PreviewPage";
 import SubmissionsPage from "./pages/SubmissionsPage";
 import SpecViewerPage from "./pages/SpecViewerPage";
+import LibraryPage from "./pages/LibraryPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/library" element={<LibraryPage />} />
             <Route path="/builder" element={<BuilderPage />} />
             <Route path="/preview" element={<PreviewPage />} />
             <Route path="/submissions" element={<SubmissionsPage />} />

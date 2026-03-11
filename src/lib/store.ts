@@ -82,10 +82,12 @@ class MetadataStore {
     if (s) { Object.assign(s, updates); this.notify(); }
   }
 
-  deleteSecao(id: string, formSpecId: string) {
-    const fs = this.formSpecs.get(formSpecId);
-    if (fs) {
-      fs.secoes = fs.secoes.filter(s => s !== id);
+  deleteSecao(id: string, formSpecId?: string) {
+    if (formSpecId) {
+      const fs = this.formSpecs.get(formSpecId);
+      if (fs) {
+        fs.secoes = fs.secoes.filter(s => s !== id);
+      }
     }
     const secao = this.secoes.get(id);
     if (secao) {
@@ -105,6 +107,109 @@ class MetadataStore {
     secao.campos.push(id);
     this.notify();
     return c;
+  }
+
+  // Create a standalone template campo (not attached to any section)
+  createTemplateCampo(campo: Omit<Campo, 'id' | 'ordem' | 'validacoes'>): Campo {
+    const id = generateId();
+    const c: Campo = { ...campo, id, ordem: 0, validacoes: [], isTemplate: true };
+    this.campos.set(id, c);
+    this.notify();
+    return c;
+  }
+
+  // Create a standalone template secao (not attached to any formspec)
+  createTemplateSecao(titulo: string): Secao {
+    const id = generateId();
+    const secao: Secao = { id, titulo, campos: [], ordem: 0, isTemplate: true };
+    this.secoes.set(id, secao);
+    this.notify();
+    return secao;
+  }
+
+  // Add a template campo to a template secao
+  addCampoToTemplateSecao(secaoId: string, campoId: string) {
+    const secao = this.secoes.get(secaoId);
+    if (!secao) return;
+    if (!secao.campos.includes(campoId)) {
+      secao.campos.push(campoId);
+      this.notify();
+    }
+  }
+
+  // Clone a template campo (deep copy with new ID, copying validations)
+  cloneCampo(campoId: string, targetSecaoId?: string): Campo | null {
+    const original = this.campos.get(campoId);
+    if (!original) return null;
+    const newId = generateId();
+    const cloned: Campo = {
+      ...original,
+      id: newId,
+      isTemplate: false,
+      templateOriginId: original.isTemplate ? original.id : original.templateOriginId,
+      validacoes: [],
+    };
+    this.campos.set(newId, cloned);
+
+    // Clone validations
+    for (const vid of original.validacoes) {
+      const v = this.validacoes.get(vid);
+      if (v) {
+        const newVid = generateId();
+        this.validacoes.set(newVid, { ...v, id: newVid });
+        cloned.validacoes.push(newVid);
+      }
+    }
+
+    // Add to target section if provided
+    if (targetSecaoId) {
+      const secao = this.secoes.get(targetSecaoId);
+      if (secao) {
+        cloned.ordem = secao.campos.length + 1;
+        secao.campos.push(newId);
+      }
+    }
+
+    this.notify();
+    return cloned;
+  }
+
+  // Clone a template secao with all its campos into a formspec
+  cloneSecaoIntoFormSpec(secaoId: string, formSpecId: string): Secao | null {
+    const original = this.secoes.get(secaoId);
+    const fs = this.formSpecs.get(formSpecId);
+    if (!original || !fs) return null;
+
+    const newSecaoId = generateId();
+    const cloned: Secao = {
+      id: newSecaoId,
+      titulo: original.titulo,
+      campos: [],
+      ordem: fs.secoes.length + 1,
+      isTemplate: false,
+      templateOriginId: original.isTemplate ? original.id : original.templateOriginId,
+    };
+    this.secoes.set(newSecaoId, cloned);
+
+    // Clone all campos
+    for (const campoId of original.campos) {
+      this.cloneCampo(campoId, newSecaoId);
+    }
+
+    fs.secoes.push(newSecaoId);
+    fs.updatedAt = new Date().toISOString();
+    this.notify();
+    return cloned;
+  }
+
+  // Get all template campos
+  getTemplateCampos(): Campo[] {
+    return Array.from(this.campos.values()).filter(c => c.isTemplate);
+  }
+
+  // Get all template secoes
+  getTemplateSecoes(): Secao[] {
+    return Array.from(this.secoes.values()).filter(s => s.isTemplate);
   }
 
   updateCampo(id: string, updates: Partial<Campo>) {
