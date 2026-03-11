@@ -195,14 +195,8 @@ function SecoesLibrary() {
                   variant="ghost"
                   size="icon"
                   onClick={() => {
-                    // Delete section and its template campos
-                    secao.campos.forEach(cid => s.deleteCampo(cid));
-                    s.secoes.delete(secao.id);
-                    // Force notify
-                    s.createFormSpec && s.notify && (() => {})();
+                    s.deleteSecao(secao.id);
                     toast.success('Seção removida da biblioteca');
-                    // We need to trigger a re-render - use a workaround
-                    window.dispatchEvent(new Event('store-change'));
                   }}
                   className="h-7 w-7 text-destructive"
                 >
