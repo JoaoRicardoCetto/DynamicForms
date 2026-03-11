@@ -22,6 +22,8 @@ export interface Campo {
   validacoes: string[]; // validacao IDs
   ordem: number;
   valorPadrao?: string;
+  isTemplate?: boolean; // true = library item, reusable
+  templateOriginId?: string; // ID of the template this was cloned from
 }
 
 export interface Secao {
